@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Octokit } from '@octokit/rest';
+import { saveUserPat, getUserPat, removeUserPat } from '../services/patStorage.js';
 
 const router = Router();
 
@@ -49,6 +50,28 @@ router.post('/', async (req, res) => {
       };
       
       // Sauvegarder explicitement la session
+      req.session.pat = pat;
+      req.session.patUser = {
+        login: user.login,
+        name: user.name,
+        avatar_url: user.avatar_url
+      };
+      
+      // Sauvegarder dans le stockage persistant
+      saveUserPat(req.user.id, {
+        pat,
+        user: {
+          login: user.login,
+          name: user.name,
+          avatar_url: user.avatar_url
+        },
+        orgs: orgs.map(org => ({
+          login: org.login,
+          name: org.name,
+          avatar_url: org.avatar_url
+        }))
+      });
+      
       req.session.save((err) => {
         if (err) {
           console.error('PAT: Erreur sauvegarde session:', err);
@@ -92,7 +115,18 @@ router.get('/orgs', async (req, res) => {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
-    const pat = req.session.pat;
+    let pat = req.session.pat;
+    
+    // Si pas en session, essayer depuis le stockage persistant
+    if (!pat && req.user.id) {
+      const storedPat = getUserPat(req.user.id);
+      if (storedPat) {
+        pat = storedPat.pat;
+        req.session.pat = pat;
+        req.session.patUser = storedPat.user;
+      }
+    }
+    
     if (!pat) {
       return res.status(400).json({ error: 'Aucun PAT enregistré' });
     }
@@ -149,9 +183,22 @@ router.get('/status', (req, res) => {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
-    const hasPat = !!req.session.pat;
-    const selectedOrg = req.session.selectedOrg;
-    const patUser = req.session.patUser;
+    // Essayer de récupérer depuis la session d'abord
+    let hasPat = !!req.session.pat;
+    let selectedOrg = req.session.selectedOrg;
+    let patUser = req.session.patUser;
+
+    // Si pas en session, essayer depuis le stockage persistant
+    if (!hasPat && req.user.id) {
+      const storedPat = getUserPat(req.user.id);
+      if (storedPat) {
+        hasPat = true;
+        patUser = storedPat.user;
+        // Restaurer dans la session
+        req.session.pat = storedPat.pat;
+        req.session.patUser = storedPat.user;
+      }
+    }
 
     res.json({
       hasPat,
