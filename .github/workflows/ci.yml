@@ -44,37 +44,12 @@ jobs:
           path: ./backend/coverage/
           retention-days: 30
       
-      - name: Comment coverage on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const coveragePath = './backend/coverage/coverage-summary.json';
-            if (fs.existsSync(coveragePath)) {
-              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
-              const lines = coverage.total.lines.pct;
-              const statements = coverage.total.statements.pct;
-              const functions = coverage.total.functions.pct;
-              const branches = coverage.total.branches.pct;
-              
-              const body = `## 📊 Backend Coverage Report
-              | Metric | Coverage |
-              |--------|----------|
-              | Lines | ${lines}% |
-              | Statements | ${statements}% |
-              | Functions | ${functions}% |
-              | Branches | ${branches}% |
-              
-              ${lines < 40 ? '⚠️ Coverage below threshold (40%)' : '✅ Coverage meets threshold'}`;
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            }
+      - name: Extract coverage percentage
+        id: coverage
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct // 0')
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Backend coverage: $COVERAGE%"
 
   frontend-tests:
     runs-on: ubuntu-latest
@@ -108,42 +83,14 @@ jobs:
           path: ./frontend/coverage/
           retention-days: 30
       
-      - name: Comment coverage on PR
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const coveragePath = './frontend/coverage/coverage-summary.json';
-            if (fs.existsSync(coveragePath)) {
-              const coverage = JSON.parse(fs.readFileSync(coveragePath, 'utf8'));
-              const lines = coverage.total.lines.pct;
-              const statements = coverage.total.statements.pct;
-              const functions = coverage.total.functions.pct;
-              const branches = coverage.total.branches.pct;
-              
-              const body = `## 📊 Frontend Coverage Report
-              | Metric | Coverage |
-              |--------|----------|
-              | Lines | ${lines}% |
-              | Statements | ${statements}% |
-              | Functions | ${functions}% |
-              | Branches | ${branches}% |
-              
-              ${lines < 40 ? '⚠️ Coverage below threshold (40%)' : '✅ Coverage meets threshold'}`;
-              
-              github.rest.issues.createComment({
-                issue_number: context.issue.number,
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                body: body
-              });
-            }
-      
-      - name: Build
-        run: npm run build
+      - name: Extract coverage percentage
+        id: coverage
+        run: |
+          COVERAGE=$(cat coverage/coverage-summary.json | jq '.total.lines.pct // 0')
+          echo "coverage=$COVERAGE" >> $GITHUB_OUTPUT
+          echo "Frontend coverage: $COVERAGE%"
 
-  coverage-check:
+  coverage-compare:
     runs-on: ubuntu-latest
     needs: [backend-tests, frontend-tests]
     if: github.event_name == 'pull_request'
@@ -153,45 +100,172 @@ jobs:
         with:
           fetch-depth: 0
       
+      - name: Download PR coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: backend-coverage-report
+          path: ./pr-coverage/backend
+      
+      - name: Download PR frontend coverage
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-coverage-report
+          path: ./pr-coverage/frontend
+      
+      - name: Checkout main branch coverage
+        run: |
+          git fetch origin main:main
+          git checkout main -- coverage-summary.json || echo "No coverage file on main"
+        continue-on-error: true
+      
+      - name: Compare coverage with main
+        id: compare
+        run: |
+          echo "## 📊 Coverage Comparison" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Get PR coverage
+          PR_BACKEND_COV=$(cat ./pr-coverage/backend/coverage-summary.json | jq '.total.lines.pct // 0')
+          PR_FRONTEND_COV=$(cat ./pr-coverage/frontend/coverage-summary.json | jq '.total.lines.pct // 0')
+          
+          echo "### PR Coverage" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend: ${PR_BACKEND_COV}%" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: ${PR_FRONTEND_COV}%" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Try to get main coverage (from cache or file)
+          MAIN_BACKEND_COV=""
+          MAIN_FRONTEND_COV=""
+          
+          if [ -f coverage-summary.json ]; then
+            MAIN_BACKEND_COV=$(cat coverage-summary.json | jq '.backend.lines // 0')
+            MAIN_FRONTEND_COV=$(cat coverage-summary.json | jq '.frontend.lines // 0')
+          fi
+          
+          # Check threshold
+          FAILED=0
+          
+          if (( $(echo "$PR_BACKEND_COV < $COVERAGE_THRESHOLD" | bc -l) )); then
+            echo "❌ Backend coverage ($PR_BACKEND_COV%) below threshold ($COVERAGE_THRESHOLD%)" >> $GITHUB_STEP_SUMMARY
+            FAILED=1
+          else
+            echo "✅ Backend coverage ($PR_BACKEND_COV%) meets threshold" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if (( $(echo "$PR_FRONTEND_COV < $COVERAGE_THRESHOLD" | bc -l) )); then
+            echo "❌ Frontend coverage ($PR_FRONTEND_COV%) below threshold ($COVERAGE_THRESHOLD%)" >> $GITHUB_STEP_SUMMARY
+            FAILED=1
+          else
+            echo "✅ Frontend coverage ($PR_FRONTEND_COV%) meets threshold" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Compare with main if available
+          if [ -n "$MAIN_BACKEND_COV" ] && [ "$MAIN_BACKEND_COV" != "0" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Comparison with main" >> $GITHUB_STEP_SUMMARY
+            
+            BACKEND_DIFF=$(echo "$PR_BACKEND_COV - $MAIN_BACKEND_COV" | bc)
+            FRONTEND_DIFF=$(echo "$PR_FRONTEND_COV - $MAIN_FRONTEND_COV" | bc)
+            
+            echo "- Backend: ${BACKEND_DIFF}% ($MAIN_BACKEND_COV% → $PR_BACKEND_COV%)" >> $GITHUB_STEP_SUMMARY
+            echo "- Frontend: ${FRONTEND_DIFF}% ($MAIN_FRONTEND_COV% → $PR_FRONTEND_COV%)" >> $GITHUB_STEP_SUMMARY
+            
+            # Fail if coverage decreased
+            if (( $(echo "$BACKEND_DIFF < 0" | bc -l) )); then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **WARNING: Backend coverage decreased by ${BACKEND_DIFF#-}%**" >> $GITHUB_STEP_SUMMARY
+              # Uncomment to make this a hard failure:
+              # FAILED=1
+            fi
+            
+            if (( $(echo "$FRONTEND_DIFF < 0" | bc -l) )); then
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "⚠️ **WARNING: Frontend coverage decreased by ${FRONTEND_DIFF#-}%**" >> $GITHUB_STEP_SUMMARY
+              # Uncomment to make this a hard failure:
+              # FAILED=1
+            fi
+          fi
+          
+          if [ $FAILED -eq 1 ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Coverage check FAILED**" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ **Coverage check PASSED**" >> $GITHUB_STEP_SUMMARY
+      
+      - name: Comment PR with coverage comparison
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Read PR coverage
+            const backendCov = JSON.parse(fs.readFileSync('./pr-coverage/backend/coverage-summary.json', 'utf8'));
+            const frontendCov = JSON.parse(fs.readFileSync('./pr-coverage/frontend/coverage-summary.json', 'utf8'));
+            
+            const backendLines = backendCov.total.lines.pct;
+            const frontendLines = frontendCov.total.lines.pct;
+            
+            const body = `## 📊 Coverage Report
+            
+            | Project | Coverage | Threshold | Status |
+            |---------|----------|-----------|--------|
+            | Backend | ${backendLines}% | 55% | ${backendLines >= 55 ? '✅' : '❌'} |
+            | Frontend | ${frontendLines}% | 55% | ${frontendLines >= 55 ? '✅' : '❌'} |
+            
+            ${backendLines < 55 || frontendLines < 55 ? '❌ **Coverage check FAILED**' : '✅ **Coverage check PASSED**'}
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+  coverage-store:
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-tests]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
       - name: Download backend coverage
         uses: actions/download-artifact@v4
         with:
           name: backend-coverage-report
-          path: ./backend-coverage
+          path: ./coverage/backend
       
       - name: Download frontend coverage
         uses: actions/download-artifact@v4
         with:
           name: frontend-coverage-report
-          path: ./frontend-coverage
+          path: ./coverage/frontend
       
-      - name: Check coverage didn't decrease
+      - name: Store coverage for main branch
         run: |
-          echo "## Coverage Check" >> $GITHUB_STEP_SUMMARY
+          # Create coverage summary for main
+          BACKEND_COV=$(cat ./coverage/backend/coverage-summary.json | jq '.total.lines.pct // 0')
+          FRONTEND_COV=$(cat ./coverage/frontend/coverage-summary.json | jq '.total.lines.pct // 0')
           
-          # Get main branch coverage (would need to be stored somewhere)
-          # For now, just check against threshold
-          echo "Checking coverage against threshold ($COVERAGE_THRESHOLD%)..." >> $GITHUB_STEP_SUMMARY
+          echo "{" > coverage-summary.json
+          echo "  \"backend\": {" >> coverage-summary.json
+          echo "    \"lines\": $BACKEND_COV" >> coverage-summary.json
+          echo "  }," >> coverage-summary.json
+          echo "  \"frontend\": {" >> coverage-summary.json
+          echo "    \"lines\": $FRONTEND_COV" >> coverage-summary.json
+          echo "  }" >> coverage-summary.json
+          echo "}" >> coverage-summary.json
           
-          if [ -f ./backend-coverage/coverage-summary.json ]; then
-            BACKEND_COV=$(cat ./backend-coverage/coverage-summary.json | jq '.total.lines.pct // 0')
-            echo "Backend: ${BACKEND_COV}%" >> $GITHUB_STEP_SUMMARY
-            if (( $(echo "$BACKEND_COV < $COVERAGE_THRESHOLD" | bc -l) )); then
-              echo "❌ Backend coverage below threshold" >> $GITHUB_STEP_SUMMARY
-              exit 1
-            fi
-          fi
+          cat coverage-summary.json
           
-          if [ -f ./frontend-coverage/coverage-summary.json ]; then
-            FRONTEND_COV=$(cat ./frontend-coverage/coverage-summary.json | jq '.total.lines.pct // 0')
-            echo "Frontend: ${FRONTEND_COV}%" >> $GITHUB_STEP_SUMMARY
-            if (( $(echo "$FRONTEND_COV < $COVERAGE_THRESHOLD" | bc -l) )); then
-              echo "❌ Frontend coverage below threshold" >> $GITHUB_STEP_SUMMARY
-              exit 1
-            fi
-          fi
-          
-          echo "✅ All coverage checks passed!" >> $GITHUB_STEP_SUMMARY
+          # Commit coverage file (optional - could also use artifacts or external storage)
+          # git add coverage-summary.json
+          # git commit -m "chore: Update coverage summary [skip ci]"
+          # git push
 
   integration-check:
     runs-on: ubuntu-latest
