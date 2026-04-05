@@ -23,9 +23,9 @@ function Dashboard({ user }: DashboardProps) {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrg, setSelectedOrg] = useState('');
+  const [selectedOrg, setSelectedOrg] = useState('Epitech');
   const [availableOrgs, setAvailableOrgs] = useState<Org[]>([]);
   const [patConfigured, setPatConfigured] = useState(false);
   
