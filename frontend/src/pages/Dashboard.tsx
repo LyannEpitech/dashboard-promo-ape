@@ -112,10 +112,11 @@ function Dashboard({ user }: DashboardProps) {
     }
   };
 
-  useEffect(() => {
-    if (!selectedOrg) return;
-    fetchStudents();
-  }, [selectedOrg, page]);
+  // Ne pas charger automatiquement - attendre le clic sur le bouton
+  // useEffect(() => {
+  //   if (!selectedOrg) return;
+  //   fetchStudents();
+  // }, [selectedOrg, page]);
 
   const handleSelectStudent = (username: string) => {
     navigate(`/student/${username}`);
@@ -216,8 +217,25 @@ function Dashboard({ user }: DashboardProps) {
         <section className="students-section">
           <div className="students-section-header">
             <h2>Liste des étudiants</h2>
-            <ExportButton />
+            <div className="header-actions">
+              <button 
+                onClick={fetchStudents}
+                disabled={loading || !selectedOrg}
+                className="btn-load"
+              >
+                {loading ? 'Chargement...' : '🔄 Charger les étudiants'}
+              </button>
+              <ExportButton />
+            </div>
           </div>
+          
+          {students.length === 0 && !loading && (
+            <div className="empty-state">
+              <p>Cliquez sur "Charger les étudiants" pour voir la liste.</p>
+              <p className="empty-hint">💡 Cette action utilise l'API GitHub (rate limit)</p>
+            </div>
+          )}
+          
           <div className="pagination-info">
             {searchQuery ? (
               <span>{total} résultat{total !== 1 ? 's' : ''} pour "{searchQuery}"</span>

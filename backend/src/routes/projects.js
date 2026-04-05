@@ -13,6 +13,11 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
+    // Paramètres de pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+
     // Utiliser le PAT s'il est configuré, sinon utiliser le token OAuth
     const accessToken = req.session.pat || req.user.accessToken;
     const github = new GitHubService(accessToken);
@@ -23,8 +28,8 @@ router.get('/', async (req, res) => {
     const repos = await github.getOrgRepos(org);
     
     // Pour chaque repo, récupérer les contributeurs
-    const projectsWithContributors = await Promise.all(
-      repos.slice(0, 50).map(async (repo) => {
+    let projectsWithContributors = await Promise.all(
+      repos.map(async (repo) => {
         try {
           // Récupérer les contributeurs
           const contributors = await github.getRepoContributors(org, repo.name);
@@ -70,16 +75,36 @@ router.get('/', async (req, res) => {
       })
     );
     
+    // Filtrer par recherche si spécifié
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      projectsWithContributors = projectsWithContributors.filter(project => 
+        project.name.toLowerCase().includes(searchLower) ||
+        (project.description && project.description.toLowerCase().includes(searchLower)) ||
+        (project.language && project.language.toLowerCase().includes(searchLower))
+      );
+    }
+
     // Trier par nombre de contributeurs
     const sortedProjects = projectsWithContributors.sort((a, b) => 
       b.contributors.length - a.contributors.length
     );
     
+    // Pagination
+    const total = sortedProjects.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedProjects = sortedProjects.slice(startIndex, endIndex);
+    
     res.json({
       success: true,
-      count: sortedProjects.length,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
       organization: org,
-      projects: sortedProjects
+      search: search || undefined,
+      projects: paginatedProjects
     });
     
   } catch (error) {

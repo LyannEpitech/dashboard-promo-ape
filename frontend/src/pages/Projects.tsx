@@ -33,37 +33,40 @@ interface ProjectsProps {
 
 function Projects({ user }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState('');
   const [availableOrgs, setAvailableOrgs] = useState<any[]>([]);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   useEffect(() => {
     fetchOrgs();
   }, []);
 
-  // Filtrer les projets selon la recherche
+  // Recharger quand la recherche change (avec debounce)
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProjects(projects);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = projects.filter(project => 
-        project.name.toLowerCase().includes(query) ||
-        (project.description && project.description.toLowerCase().includes(query)) ||
-        (project.language && project.language.toLowerCase().includes(query))
-      );
-      setFilteredProjects(filtered);
-    }
-  }, [searchQuery, projects]);
+    const timer = setTimeout(() => {
+      setPage(1);
+      if (selectedOrg && projects.length > 0) {
+        fetchProjects();
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-  useEffect(() => {
-    if (selectedOrg) {
-      fetchProjects();
-    }
-  }, [selectedOrg]);
+  // Ne pas charger automatiquement - attendre le clic sur le bouton
+  // useEffect(() => {
+  //   if (selectedOrg) {
+  //     fetchProjects();
+  //   }
+  // }, [selectedOrg]);
 
   const fetchOrgs = async () => {
     try {
@@ -85,7 +88,12 @@ function Projects({ user }: ProjectsProps) {
       setLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/projects?org=${selectedOrg}`, {
+      let url = `/api/projects?org=${selectedOrg}&page=${page}&limit=${limit}`;
+      if (searchQuery.trim()) {
+        url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
+      
+      const response = await fetch(url, {
         credentials: 'include'
       });
       
@@ -101,7 +109,8 @@ function Projects({ user }: ProjectsProps) {
       }
       
       setProjects(data.projects);
-      setFilteredProjects(data.projects);
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -142,6 +151,13 @@ function Projects({ user }: ProjectsProps) {
               ))}
             </select>
           </div>
+          <button 
+            onClick={fetchProjects}
+            disabled={loading || !selectedOrg}
+            className="btn-load"
+          >
+            {loading ? 'Chargement...' : '🔄 Charger les projets'}
+          </button>
         </div>
 
         {error && <div className="error-banner">{error}</div>}
@@ -157,19 +173,26 @@ function Projects({ user }: ProjectsProps) {
               </button>
             )}
           </div>
-        ) : filteredProjects.length === 0 ? (
+        ) : projects.length === 0 && !loading ? (
           <div className="empty-state">
-            <p>Aucun projet trouvé pour cette organisation.</p>
+            <p>Cliquez sur "Charger les projets" pour voir la liste.</p>
+            <p className="empty-hint">💡 Cette action utilise l'API GitHub (rate limit)</p>
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="empty-state">
+            <p>Aucun projet trouvé pour cette recherche.</p>
           </div>
         ) : (
           <>
-          {searchQuery && (
-            <div className="search-results">
-              {filteredProjects.length} résultat{filteredProjects.length !== 1 ? 's' : ''} pour "{searchQuery}"
-            </div>
-          )}
+          <div className="pagination-info">
+            {searchQuery ? (
+              <span>{total} résultat{total !== 1 ? 's' : ''} pour "{searchQuery}"</span>
+            ) : (
+              <span>Page {page} sur {totalPages} ({total} projets)</span>
+            )}
+          </div>
           <div className="projects-grid">
-            {filteredProjects.map(project => (
+            {projects.map(project => (
               <div key={project.id} className="project-card">
                 <div className="project-header">
                   <h3>
@@ -236,6 +259,24 @@ function Projects({ user }: ProjectsProps) {
               </div>
             ))}
           </div>
+          
+          {totalPages > 1 && (
+            <div className="pagination-controls">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+              >
+                ← Précédent
+              </button>
+              <span>Page {page} / {totalPages}</span>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+              >
+                Suivant →
+              </button>
+            </div>
+          )}
           </>
         )}
       </div>
