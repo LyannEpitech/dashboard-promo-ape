@@ -1,0 +1,27 @@
+.alert-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.alert-inactive {
+  background: #fee;
+  color: #c33;
+}
+
+.alert-rush {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.alert-active {
+  background: #d4edda;
+  color: #155724;
+}
+
+.alert-error {
+  background: #f8d7da;
+  color: #721c24;
+}

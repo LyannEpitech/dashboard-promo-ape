@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
+import StudentDetail from './pages/StudentDetail'
 import './App.css'
 
 function App() {
@@ -30,6 +31,10 @@ function App() {
         <Route 
           path="/dashboard" 
           element={user ? <Dashboard user={user} /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/student/:username" 
+          element={user ? <StudentDetail /> : <Navigate to="/login" />} 
         />
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
