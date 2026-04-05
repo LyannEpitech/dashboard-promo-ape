@@ -3,6 +3,8 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import Projects from './Projects';
 
+declare const global: any;
+
 const mockUser = {
   username: 'testuser',
   displayName: 'Test User'

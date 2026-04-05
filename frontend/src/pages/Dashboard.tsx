@@ -22,6 +22,8 @@ interface DashboardProps {
 function Dashboard({ user }: DashboardProps) {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState('');
@@ -59,6 +61,20 @@ function Dashboard({ user }: DashboardProps) {
     fetchOrgs();
   }, []);
 
+  // Filtrer les étudiants selon la recherche
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredStudents(students);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = students.filter(student => 
+        student.username.toLowerCase().includes(query) ||
+        student.displayName.toLowerCase().includes(query)
+      );
+      setFilteredStudents(filtered);
+    }
+  }, [searchQuery, students]);
+
   useEffect(() => {
     if (!selectedOrg) return;
     
@@ -81,6 +97,7 @@ function Dashboard({ user }: DashboardProps) {
         
         const data = await response.json();
         setStudents(data.students);
+        setFilteredStudents(data.students);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erreur inconnue');
       } finally {
@@ -135,6 +152,15 @@ function Dashboard({ user }: DashboardProps) {
         )}
         
         <div className="dashboard-header-row">
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Rechercher un étudiant..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
           <div className="org-selector-container">
             <label>Organisation:</label>
             <select 
@@ -185,8 +211,13 @@ function Dashboard({ user }: DashboardProps) {
             <h2>Liste des étudiants</h2>
             <ExportButton />
           </div>
+          {searchQuery && (
+            <div className="search-results">
+              {filteredStudents.length} résultat{filteredStudents.length !== 1 ? 's' : ''} pour "{searchQuery}"
+            </div>
+          )}
           <StudentList 
-            students={students}
+            students={filteredStudents}
             loading={loading}
             onSelectStudent={handleSelectStudent}
           />

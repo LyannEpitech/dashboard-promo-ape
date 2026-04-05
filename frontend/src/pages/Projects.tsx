@@ -33,6 +33,8 @@ interface ProjectsProps {
 
 function Projects({ user }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState('');
@@ -41,6 +43,21 @@ function Projects({ user }: ProjectsProps) {
   useEffect(() => {
     fetchOrgs();
   }, []);
+
+  // Filtrer les projets selon la recherche
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredProjects(projects);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = projects.filter(project => 
+        project.name.toLowerCase().includes(query) ||
+        (project.description && project.description.toLowerCase().includes(query)) ||
+        (project.language && project.language.toLowerCase().includes(query))
+      );
+      setFilteredProjects(filtered);
+    }
+  }, [searchQuery, projects]);
 
   useEffect(() => {
     if (selectedOrg) {
@@ -84,6 +101,7 @@ function Projects({ user }: ProjectsProps) {
       }
       
       setProjects(data.projects);
+      setFilteredProjects(data.projects);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -98,21 +116,32 @@ function Projects({ user }: ProjectsProps) {
         <h2>Vue transversale par projet</h2>
         
         <div className="org-selector-row">
-          <label>Organisation:</label>
-          <select 
-            value={selectedOrg} 
-            onChange={(e) => setSelectedOrg(e.target.value)}
-          >
-            {/* Option par défaut si aucune org disponible */}
-            {availableOrgs.length === 0 && selectedOrg && (
-              <option value={selectedOrg}>{selectedOrg}</option>
-            )}
-            {availableOrgs.map(org => (
-              <option key={org.login} value={org.login}>
-                {org.name || org.login}
-              </option>
-            ))}
-          </select>
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Rechercher un projet..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+          <div className="org-select-wrapper">
+            <label>Organisation:</label>
+            <select 
+              value={selectedOrg} 
+              onChange={(e) => setSelectedOrg(e.target.value)}
+            >
+              {/* Option par défaut si aucune org disponible */}
+              {availableOrgs.length === 0 && selectedOrg && (
+                <option value={selectedOrg}>{selectedOrg}</option>
+              )}
+              {availableOrgs.map(org => (
+                <option key={org.login} value={org.login}>
+                  {org.name || org.login}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {error && <div className="error-banner">{error}</div>}
@@ -128,13 +157,19 @@ function Projects({ user }: ProjectsProps) {
               </button>
             )}
           </div>
-        ) : projects.length === 0 ? (
+        ) : filteredProjects.length === 0 ? (
           <div className="empty-state">
             <p>Aucun projet trouvé pour cette organisation.</p>
           </div>
         ) : (
+          <>
+          {searchQuery && (
+            <div className="search-results">
+              {filteredProjects.length} résultat{filteredProjects.length !== 1 ? 's' : ''} pour "{searchQuery}"
+            </div>
+          )}
           <div className="projects-grid">
-            {projects.map(project => (
+            {filteredProjects.map(project => (
               <div key={project.id} className="project-card">
                 <div className="project-header">
                   <h3>
@@ -201,6 +236,7 @@ function Projects({ user }: ProjectsProps) {
               </div>
             ))}
           </div>
+          </>
         )}
       </div>
     </div>

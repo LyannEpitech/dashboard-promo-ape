@@ -3,6 +3,8 @@ import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import WebhookConfig from './WebhookConfig';
 
+declare const global: any;
+
 const mockUser = {
   username: 'testuser',
   displayName: 'Test User'
