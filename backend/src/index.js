@@ -4,6 +4,7 @@ import session from 'express-session';
 import passport from 'passport';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import dotenv from 'dotenv';
+import studentsRoutes from './routes/students.js';
 
 dotenv.config();
 
@@ -86,7 +87,8 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
-// TODO: Routes pour étudiants, projets, alertes
+// Routes pour étudiants
+app.use('/api/students', studentsRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
