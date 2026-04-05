@@ -77,7 +77,13 @@ function Projects({ user }: ProjectsProps) {
       }
       
       const data = await response.json();
-      setProjects(data.projects || []);
+      
+      if (!data.projects || !Array.isArray(data.projects)) {
+        console.error('Format de réponse invalide:', data);
+        throw new Error(data.message || 'Format de réponse invalide');
+      }
+      
+      setProjects(data.projects);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
@@ -97,6 +103,10 @@ function Projects({ user }: ProjectsProps) {
             value={selectedOrg} 
             onChange={(e) => setSelectedOrg(e.target.value)}
           >
+            {/* Option par défaut si aucune org disponible */}
+            {availableOrgs.length === 0 && selectedOrg && (
+              <option value={selectedOrg}>{selectedOrg}</option>
+            )}
             {availableOrgs.map(org => (
               <option key={org.login} value={org.login}>
                 {org.name || org.login}
@@ -109,6 +119,19 @@ function Projects({ user }: ProjectsProps) {
         
         {loading ? (
           <div className="loading">Chargement des projets...</div>
+        ) : error ? (
+          <div className="error-state">
+            <p>{error}</p>
+            {!availableOrgs.length && (
+              <button onClick={() => window.location.href = '/config/pat'}>
+                Configurer un PAT
+              </button>
+            )}
+          </div>
+        ) : projects.length === 0 ? (
+          <div className="empty-state">
+            <p>Aucun projet trouvé pour cette organisation.</p>
+          </div>
         ) : (
           <div className="projects-grid">
             {projects.map(project => (
