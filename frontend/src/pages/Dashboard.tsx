@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import StudentList, { Student } from '../components/StudentList';
+import ExportButton from '../components/ExportButton';
 import './Dashboard.css';
 
 interface User {
@@ -123,7 +124,10 @@ function Dashboard({ user }: DashboardProps) {
         </div>
 
         <section className="students-section">
-          <h2>Liste des étudiants</h2>
+          <div className="students-section-header">
+            <h2>Liste des étudiants</h2>
+            <ExportButton />
+          </div>
           <StudentList 
             students={students}
             loading={loading}

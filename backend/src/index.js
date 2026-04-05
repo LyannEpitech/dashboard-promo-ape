@@ -5,6 +5,7 @@ import passport from 'passport';
 import { Strategy as GitHubStrategy } from 'passport-github2';
 import dotenv from 'dotenv';
 import studentsRoutes from './routes/students.js';
+import exportRoutes from './routes/export.js';
 
 dotenv.config();
 
@@ -89,6 +90,7 @@ app.get('/api/health', (req, res) => {
 
 // Routes pour étudiants
 app.use('/api/students', studentsRoutes);
+app.use('/api/export', exportRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);

@@ -151,8 +151,15 @@
 
 .students-section h2 {
   margin-top: 0;
-  margin-bottom: 1.5rem;
+  margin-bottom: 0;
   color: #333;
+}
+
+.students-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
 }
 
 @media (max-width: 768px) {
