@@ -61,12 +61,21 @@ function Projects({ user }: ProjectsProps) {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Ne pas charger automatiquement - attendre le clic sur le bouton
-  // useEffect(() => {
-  //   if (selectedOrg) {
-  //     fetchProjects();
-  //   }
-  // }, [selectedOrg]);
+  // Charger quand on change de page (pagination)
+  useEffect(() => {
+    if (!selectedOrg) return;
+    if (projects.length > 0 || total > 0) {
+      fetchProjects();
+    }
+  }, [page]);
+  
+  // Reset quand on change d'org
+  useEffect(() => {
+    setProjects([]);
+    setTotal(0);
+    setTotalPages(0);
+    setPage(1);
+  }, [selectedOrg]);
 
   const fetchOrgs = async () => {
     try {

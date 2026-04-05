@@ -112,11 +112,22 @@ function Dashboard({ user }: DashboardProps) {
     }
   };
 
-  // Ne pas charger automatiquement - attendre le clic sur le bouton
-  // useEffect(() => {
-  //   if (!selectedOrg) return;
-  //   fetchStudents();
-  // }, [selectedOrg, page]);
+  // Charger quand on change de page (pagination)
+  useEffect(() => {
+    if (!selectedOrg) return;
+    // Ne charger que si on a déjà des étudiants (évite le chargement au démarrage)
+    if (students.length > 0 || total > 0) {
+      fetchStudents();
+    }
+  }, [page]);
+  
+  // Reset quand on change d'org
+  useEffect(() => {
+    setStudents([]);
+    setTotal(0);
+    setTotalPages(0);
+    setPage(1);
+  }, [selectedOrg]);
 
   const handleSelectStudent = (username: string) => {
     navigate(`/student/${username}`);
