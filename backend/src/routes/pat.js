@@ -1,0 +1,155 @@
+import { Router } from 'express';
+import { Octokit } from '@octokit/rest';
+
+const router = Router();
+
+// POST /api/pat - Enregistrer un PAT
+router.post('/', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const { pat } = req.body;
+
+    if (!pat) {
+      return res.status(400).json({ error: 'PAT requis' });
+    }
+
+    // Validation du format PAT (ghp_xxxx ou github_pat_xxx)
+    const patRegex = /^(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})$/;
+    if (!patRegex.test(pat)) {
+      return res.status(400).json({ 
+        error: 'Format invalide. Le PAT doit commencer par ghp_ ou github_pat_' 
+      });
+    }
+
+    // Vérifier la validité du PAT avec GitHub
+    const octokit = new Octokit({ auth: pat });
+    
+    try {
+      const { data: user } = await octokit.rest.users.getAuthenticated();
+      
+      // Récupérer les organisations accessibles
+      const { data: orgs } = await octokit.rest.orgs.listForAuthenticatedUser();
+      
+      // Stocker le PAT en session (chiffré serait mieux en production)
+      req.session.pat = pat;
+      req.session.patUser = {
+        login: user.login,
+        name: user.name,
+        avatar_url: user.avatar_url
+      };
+      
+      res.json({
+        success: true,
+        message: 'PAT enregistré avec succès',
+        user: {
+          login: user.login,
+          name: user.name
+        },
+        orgs: orgs.map(org => ({
+          login: org.login,
+          name: org.name,
+          avatar_url: org.avatar_url,
+          description: org.description
+        }))
+      });
+    } catch (githubError) {
+      console.error('Erreur validation PAT:', githubError.message);
+      return res.status(401).json({ 
+        error: 'PAT invalide ou expiré',
+        details: githubError.message
+      });
+    }
+
+  } catch (error) {
+    console.error('Erreur enregistrement PAT:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/pat/orgs - Lister les orgs accessibles
+router.get('/orgs', async (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const pat = req.session.pat;
+    if (!pat) {
+      return res.status(400).json({ error: 'Aucun PAT enregistré' });
+    }
+
+    const octokit = new Octokit({ auth: pat });
+    const { data: orgs } = await octokit.rest.orgs.listForAuthenticatedUser();
+
+    res.json({
+      orgs: orgs.map(org => ({
+        login: org.login,
+        name: org.name,
+        avatar_url: org.avatar_url,
+        description: org.description
+      }))
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération orgs:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// POST /api/pat/select-org - Sélectionner une org
+router.post('/select-org', (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const { org } = req.body;
+
+    if (!org) {
+      return res.status(400).json({ error: 'Organisation requise' });
+    }
+
+    req.session.selectedOrg = org;
+
+    res.json({
+      success: true,
+      message: `Organisation ${org} sélectionnée`,
+      selectedOrg: org
+    });
+
+  } catch (error) {
+    console.error('Erreur sélection org:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+// GET /api/pat/status - Vérifier le statut PAT
+router.get('/status', (req, res) => {
+  try {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ error: 'Non authentifié' });
+    }
+
+    const hasPat = !!req.session.pat;
+    const selectedOrg = req.session.selectedOrg;
+    const patUser = req.session.patUser;
+
+    res.json({
+      hasPat,
+      selectedOrg,
+      patUser: patUser ? {
+        login: patUser.login,
+        name: patUser.name
+      } : null
+    });
+
+  } catch (error) {
+    console.error('Erreur statut PAT:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
+export default router;
