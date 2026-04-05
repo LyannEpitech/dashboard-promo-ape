@@ -6,11 +6,14 @@ const router = Router();
 // POST /api/pat - Enregistrer un PAT
 router.post('/', async (req, res) => {
   try {
+    console.log('PAT: Requête reçue, authentification:', req.isAuthenticated());
+    
     if (!req.isAuthenticated()) {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
     const { pat } = req.body;
+    console.log('PAT: Token reçu (début):', pat ? pat.substring(0, 10) + '...' : 'undefined');
 
     if (!pat) {
       return res.status(400).json({ error: 'PAT requis' });
@@ -19,6 +22,7 @@ router.post('/', async (req, res) => {
     // Validation du format PAT (ghp_xxxx ou github_pat_xxx)
     const patRegex = /^(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9]{22}_[a-zA-Z0-9]{59})$/;
     if (!patRegex.test(pat)) {
+      console.log('PAT: Format invalide');
       return res.status(400).json({ 
         error: 'Format invalide. Le PAT doit commencer par ghp_ ou github_pat_' 
       });
@@ -28,10 +32,13 @@ router.post('/', async (req, res) => {
     const octokit = new Octokit({ auth: pat });
     
     try {
+      console.log('PAT: Vérification avec GitHub...');
       const { data: user } = await octokit.rest.users.getAuthenticated();
+      console.log('PAT: Utilisateur authentifié:', user.login);
       
       // Récupérer les organisations accessibles
       const { data: orgs } = await octokit.rest.orgs.listForAuthenticatedUser();
+      console.log('PAT: Orgs récupérées:', orgs.length);
       
       // Stocker le PAT en session (chiffré serait mieux en production)
       req.session.pat = pat;
@@ -40,6 +47,15 @@ router.post('/', async (req, res) => {
         name: user.name,
         avatar_url: user.avatar_url
       };
+      
+      // Sauvegarder explicitement la session
+      req.session.save((err) => {
+        if (err) {
+          console.error('PAT: Erreur sauvegarde session:', err);
+          return res.status(500).json({ error: 'Erreur sauvegarde session' });
+        }
+        console.log('PAT: Session sauvegardée avec succès');
+      });
       
       res.json({
         success: true,

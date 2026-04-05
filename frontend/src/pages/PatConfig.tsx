@@ -47,6 +47,7 @@ function PatConfig() {
     setSuccess(null);
 
     try {
+      console.log('Envoi PAT au serveur...');
       const response = await fetch('/api/pat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -55,6 +56,7 @@ function PatConfig() {
       });
 
       const data = await response.json();
+      console.log('Réponse serveur:', data);
 
       if (!response.ok) {
         throw new Error(data.error || 'Erreur lors de l\'enregistrement du PAT');
@@ -68,6 +70,7 @@ function PatConfig() {
       });
       setPat('');
     } catch (err) {
+      console.error('Erreur:', err);
       setError(err instanceof Error ? err.message : 'Erreur inconnue');
     } finally {
       setLoading(false);
