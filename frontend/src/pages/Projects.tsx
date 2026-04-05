@@ -154,33 +154,35 @@ function Projects({ user }: ProjectsProps) {
                 <div className="project-stats">
                   <span>⭐ {project.stars}</span>
                   <span>🍴 {project.forks}</span>
-                  <span>👥 {project.contributors.length} contributeurs</span>
+                  <span>👥 {(project.contributors || []).length} contributeurs</span>
                   <span>📝 {project.totalCommits} commits</span>
                 </div>
                 
-                <div className="project-contributors">
-                  <h4>Contributeurs:</h4>
-                  <div className="contributors-list">
-                    {project.contributors.slice(0, 5).map(contributor => (
-                      <div key={contributor.username} className="contributor">
-                        <img 
-                          src={contributor.avatarUrl} 
-                          alt={contributor.username}
-                          className="contributor-avatar"
-                        />
-                        <span className="contributor-name">{contributor.username}</span>
-                        <span className="contributor-count">{contributor.contributions}</span>
-                      </div>
-                    ))}
-                    {project.contributors.length > 5 && (
-                      <span className="more-contributors">
-                        +{project.contributors.length - 5} autres
-                      </span>
-                    )}
+                {project.contributors && project.contributors.length > 0 && (
+                  <div className="project-contributors">
+                    <h4>Contributeurs:</h4>
+                    <div className="contributors-list">
+                      {project.contributors.slice(0, 5).map(contributor => (
+                        <div key={contributor.username} className="contributor">
+                          <img 
+                            src={contributor.avatarUrl} 
+                            alt={contributor.username}
+                            className="contributor-avatar"
+                          />
+                          <span className="contributor-name">{contributor.username}</span>
+                          <span className="contributor-count">{contributor.contributions}</span>
+                        </div>
+                      ))}
+                      {project.contributors.length > 5 && (
+                        <span className="more-contributors">
+                          +{project.contributors.length - 5} autres
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
                 
-                {project.recentCommits.length > 0 && (
+                {project.recentCommits && project.recentCommits.length > 0 && (
                   <div className="project-commits">
                     <h4>Commits récents:</h4>
                     <ul>
