@@ -22,13 +22,18 @@ interface DashboardProps {
 function Dashboard({ user }: DashboardProps) {
   const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
-  const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState('');
   const [availableOrgs, setAvailableOrgs] = useState<Org[]>([]);
   const [patConfigured, setPatConfigured] = useState(false);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
   // Récupérer les orgs disponibles via PAT
   useEffect(() => {
@@ -61,52 +66,56 @@ function Dashboard({ user }: DashboardProps) {
     fetchOrgs();
   }, []);
 
-  // Filtrer les étudiants selon la recherche
+  // Recharger quand la recherche change (avec debounce)
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredStudents(students);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const filtered = students.filter(student => 
-        student.username.toLowerCase().includes(query) ||
-        student.displayName.toLowerCase().includes(query)
-      );
-      setFilteredStudents(filtered);
+    const timer = setTimeout(() => {
+      setPage(1); // Reset à la page 1 quand on recherche
+      if (selectedOrg) {
+        fetchStudents();
+      }
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Construire l'URL avec pagination et recherche
+      let url = `/api/students?org=${selectedOrg}&page=${page}&limit=${limit}`;
+      if (searchQuery.trim()) {
+        url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
+      
+      const response = await fetch(url, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        throw new Error('Erreur lors de la récupération des étudiants');
+      }
+      
+      const data = await response.json();
+      setStudents(data.students);
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setLoading(false);
     }
-  }, [searchQuery, students]);
+  };
 
   useEffect(() => {
     if (!selectedOrg) return;
-    
-    const fetchStudents = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await fetch(`/api/students?org=${selectedOrg}`, {
-          credentials: 'include'
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            window.location.href = '/login';
-            return;
-          }
-          throw new Error('Erreur lors de la récupération des étudiants');
-        }
-        
-        const data = await response.json();
-        setStudents(data.students);
-        setFilteredStudents(data.students);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     fetchStudents();
-  }, [selectedOrg]);
+  }, [selectedOrg, page]);
 
   const handleSelectStudent = (username: string) => {
     navigate(`/student/${username}`);
@@ -183,24 +192,22 @@ function Dashboard({ user }: DashboardProps) {
         
         <div className="dashboard-stats">
           <div className="stat-card">
-            <span className="stat-number">{students.length}</span>
-            <span className="stat-label">Étudiants</span>
+            <span className="stat-number">{total}</span>
+            <span className="stat-label">Étudiants total</span>
           </div>
           <div className="stat-card">
-            <span className="stat-number">
-              {students.reduce((acc, s) => acc + s.totalCommits, 0)}
-            </span>
-            <span className="stat-label">Commits total</span>
+            <span className="stat-number">{students.length}</span>
+            <span className="stat-label">Affichés</span>
           </div>
           <div className="stat-card alert">
             <span className="stat-number">
-              {students.filter(s => s.isInactive).length}
+              {Math.round(students.filter(s => s.isInactive).length / students.length * 100) || 0}%
             </span>
-            <span className="stat-label">Inactifs (3j+)</span>
+            <span className="stat-label">Inactifs</span>
           </div>
           <div className="stat-card warning">
             <span className="stat-number">
-              {students.filter(s => s.isRush).length}
+              {Math.round(students.filter(s => s.isRush).length / students.length * 100) || 0}%
             </span>
             <span className="stat-label">En rush</span>
           </div>
@@ -211,16 +218,37 @@ function Dashboard({ user }: DashboardProps) {
             <h2>Liste des étudiants</h2>
             <ExportButton />
           </div>
-          {searchQuery && (
-            <div className="search-results">
-              {filteredStudents.length} résultat{filteredStudents.length !== 1 ? 's' : ''} pour "{searchQuery}"
-            </div>
-          )}
+          <div className="pagination-info">
+            {searchQuery ? (
+              <span>{total} résultat{total !== 1 ? 's' : ''} pour "{searchQuery}"</span>
+            ) : (
+              <span>Page {page} sur {totalPages} ({total} étudiants)</span>
+            )}
+          </div>
+          
           <StudentList 
-            students={filteredStudents}
+            students={students}
             loading={loading}
             onSelectStudent={handleSelectStudent}
           />
+          
+          {totalPages > 1 && (
+            <div className="pagination-controls">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+              >
+                ← Précédent
+              </button>
+              <span>Page {page} / {totalPages}</span>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+              >
+                Suivant →
+              </button>
+            </div>
+          )}
         </section>
       </main>
     </div>

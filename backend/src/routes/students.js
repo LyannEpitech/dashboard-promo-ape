@@ -15,6 +15,11 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
+    // Paramètres de pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+    
     // Utiliser le PAT s'il est configuré, sinon utiliser le token OAuth
     const accessToken = req.session.pat || req.user.accessToken;
     const github = new GitHubService(accessToken);
@@ -22,11 +27,11 @@ router.get('/', async (req, res) => {
     // Récupérer l'organisation depuis les paramètres ou utiliser celle sélectionnée
     const org = req.query.org || req.session.selectedOrg || 'Epitech';
     
-    // Récupérer les membres de l'organisation (max 100)
-    const members = await github.getOrgMembers(org, 100);
+    // Récupérer tous les membres de l'organisation
+    const members = await github.getOrgMembers(org, 200);
     
     // Récupérer les détails et métriques pour chaque étudiant
-    const students = await Promise.all(
+    let students = await Promise.all(
       members.map(async (member) => {
         try {
           // Récupérer les infos utilisateur
@@ -68,14 +73,33 @@ router.get('/', async (req, res) => {
       })
     );
     
+    // Filtrer par recherche si spécifié
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      students = students.filter(student => 
+        student.username.toLowerCase().includes(searchLower) ||
+        student.displayName.toLowerCase().includes(searchLower)
+      );
+    }
+    
     // Trier par score d'activité (descendant)
     const sortedStudents = students.sort((a, b) => b.activityScore - a.activityScore);
     
+    // Pagination
+    const total = sortedStudents.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedStudents = sortedStudents.slice(startIndex, endIndex);
+    
     res.json({
       success: true,
-      count: sortedStudents.length,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
       organization: org,
-      students: sortedStudents
+      search: search || undefined,
+      students: paginatedStudents
     });
     
   } catch (error) {
