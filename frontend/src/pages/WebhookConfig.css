@@ -1,0 +1,92 @@
+.webhook-config-page {
+  min-height: 100vh;
+  background: #f5f7fa;
+}
+
+.webhook-config {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.webhook-info {
+  background: #e3f2fd;
+  border-left: 4px solid #2196f3;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: 4px;
+}
+
+.webhook-info ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.webhook-form {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  margin-bottom: 2rem;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.form-group select {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.configured-webhooks {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.webhook-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.webhook-info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.webhook-url {
+  font-size: 0.85rem;
+  color: #666;
+}
+
+.webhook-events {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.btn-danger {
+  background: #d73a49;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-danger:hover {
+  background: #cb2431;
+}

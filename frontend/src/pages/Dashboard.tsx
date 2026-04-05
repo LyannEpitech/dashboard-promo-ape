@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StudentList, { Student } from '../components/StudentList';
 import ExportButton from '../components/ExportButton';
+import Navbar from '../components/Navbar';
 import './Dashboard.css';
 
 interface User {
@@ -8,89 +10,161 @@ interface User {
   displayName: string;
 }
 
+interface Org {
+  login: string;
+  name: string;
+}
+
 interface DashboardProps {
   user: User;
 }
 
 function Dashboard({ user }: DashboardProps) {
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState('Epitech');
+  const [availableOrgs, setAvailableOrgs] = useState<Org[]>([]);
+  const [patConfigured, setPatConfigured] = useState(false);
+  
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [limit] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
 
+  // Récupérer les orgs disponibles via PAT
   useEffect(() => {
-    const fetchStudents = async () => {
+    const fetchOrgs = async () => {
       try {
-        setLoading(true);
-        setError(null);
-        
-        const response = await fetch(`/api/students?org=${selectedOrg}`, {
+        const response = await fetch('/api/pat/orgs', {
           credentials: 'include'
         });
         
-        if (!response.ok) {
-          if (response.status === 401) {
-            window.location.href = '/login';
-            return;
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableOrgs(data.orgs || []);
+          if (data.orgs && data.orgs.length > 0) {
+            setSelectedOrg(data.orgs[0].login);
+            setPatConfigured(true);
           }
-          throw new Error('Erreur lors de la récupération des étudiants');
+        } else if (response.status === 400) {
+          // PAT non configuré
+          setPatConfigured(false);
+          // Fallback sur Epitech
+          setSelectedOrg('Epitech');
         }
-        
-        const data = await response.json();
-        setStudents(data.students);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erreur inconnue');
-      } finally {
-        setLoading(false);
+        console.error('Erreur récupération orgs:', err);
+        setPatConfigured(false);
+        setSelectedOrg('Epitech');
       }
     };
     
-    fetchStudents();
+    fetchOrgs();
+  }, []);
+
+  // Recharger quand la recherche change (avec debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(1); // Reset à la page 1 quand on recherche
+      if (selectedOrg) {
+        fetchStudents();
+      }
+    }, 300); // 300ms debounce
+    
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const fetchStudents = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Construire l'URL avec pagination et recherche
+      let url = `/api/students?org=${selectedOrg}&page=${page}&limit=${limit}`;
+      if (searchQuery.trim()) {
+        url += `&search=${encodeURIComponent(searchQuery)}`;
+      }
+      
+      const response = await fetch(url, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+        throw new Error('Erreur lors de la récupération des étudiants');
+      }
+      
+      const data = await response.json();
+      setStudents(data.students);
+      setTotal(data.total);
+      setTotalPages(data.totalPages);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur inconnue');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Charger quand on change de page (pagination)
+  useEffect(() => {
+    if (!selectedOrg) return;
+    // Ne charger que si on a déjà des étudiants (évite le chargement au démarrage)
+    if (students.length > 0 || total > 0) {
+      fetchStudents();
+    }
+  }, [page]);
+  
+  // Reset quand on change d'org
+  useEffect(() => {
+    setStudents([]);
+    setTotal(0);
+    setTotalPages(0);
+    setPage(1);
   }, [selectedOrg]);
 
   const handleSelectStudent = (username: string) => {
-    // Navigation vers la page détail (à implémenter dans US3)
-    console.log('Sélection de l\'étudiant:', username);
-    alert(`Détail de l'étudiant ${username} - À implémenter dans US3`);
+    navigate(`/student/${username}`);
   };
 
-  const handleLogout = async () => {
-    await fetch('/auth/logout', { credentials: 'include' });
-    window.location.href = '/login';
+  const handleOrgChange = async (orgLogin: string) => {
+    setSelectedOrg(orgLogin);
+    
+    // Sauvegarder l'org sélectionnée dans la session
+    if (patConfigured) {
+      try {
+        await fetch('/api/pat/select-org', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ org: orgLogin })
+        });
+      } catch (err) {
+        console.error('Erreur sauvegarde org:', err);
+      }
+    }
   };
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <div className="header-brand">
-          <h1>Dashboard Promo APE</h1>
-          <span className="header-subtitle">Vue d'ensemble de la promo</span>
-        </div>
-        
-        <div className="header-actions">
-          <div className="org-selector">
-            <label>Organisation:</label>
-            <select 
-              value={selectedOrg} 
-              onChange={(e) => setSelectedOrg(e.target.value)}
-            >
-              <option value="Epitech">Epitech</option>
-              <option value="EpitechPromo2026">Promo 2026</option>
-            </select>
-          </div>
-          
-          <div className="user-menu">
-            <span className="user-name">
-              {user.displayName || user.username}
-            </span>
-            <button onClick={handleLogout} className="logout-btn">
-              Déconnexion
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navbar user={user} />
       
       <main className="dashboard-content">
+        {!patConfigured && (
+          <div className="pat-warning-banner">
+            <span>⚠️ PAT non configuré. Certaines organisations peuvent ne pas être accessibles.</span>
+            <button onClick={() => navigate('/config/pat')}>
+              Configurer PAT
+            </button>
+          </div>
+        )}
+        
         {error && (
           <div className="error-banner">
             <span>{error}</span>
@@ -98,26 +172,54 @@ function Dashboard({ user }: DashboardProps) {
           </div>
         )}
         
+        <div className="dashboard-header-row">
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Rechercher un étudiant..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+          </div>
+          <div className="org-selector-container">
+            <label>Organisation:</label>
+            <select 
+              value={selectedOrg} 
+              onChange={(e) => handleOrgChange(e.target.value)}
+              className="org-select"
+            >
+              {availableOrgs.length > 0 ? (
+                availableOrgs.map(org => (
+                  <option key={org.login} value={org.login}>
+                    {org.name || org.login}
+                  </option>
+                ))
+              ) : (
+                <option value="Epitech">Epitech</option>
+              )}
+            </select>
+          </div>
+        </div>
+        
         <div className="dashboard-stats">
           <div className="stat-card">
-            <span className="stat-number">{students.length}</span>
-            <span className="stat-label">Étudiants</span>
+            <span className="stat-number">{total}</span>
+            <span className="stat-label">Étudiants total</span>
           </div>
           <div className="stat-card">
-            <span className="stat-number">
-              {students.reduce((acc, s) => acc + s.totalCommits, 0)}
-            </span>
-            <span className="stat-label">Commits total</span>
+            <span className="stat-number">{students.length}</span>
+            <span className="stat-label">Affichés</span>
           </div>
           <div className="stat-card alert">
             <span className="stat-number">
-              {students.filter(s => s.isInactive).length}
+              {Math.round(students.filter(s => s.isInactive).length / students.length * 100) || 0}%
             </span>
-            <span className="stat-label">Inactifs (3j+)</span>
+            <span className="stat-label">Inactifs</span>
           </div>
           <div className="stat-card warning">
             <span className="stat-number">
-              {students.filter(s => s.isRush).length}
+              {Math.round(students.filter(s => s.isRush).length / students.length * 100) || 0}%
             </span>
             <span className="stat-label">En rush</span>
           </div>
@@ -126,13 +228,56 @@ function Dashboard({ user }: DashboardProps) {
         <section className="students-section">
           <div className="students-section-header">
             <h2>Liste des étudiants</h2>
-            <ExportButton />
+            <div className="header-actions">
+              <button 
+                onClick={fetchStudents}
+                disabled={loading || !selectedOrg}
+                className="btn-load"
+              >
+                {loading ? 'Chargement...' : '🔄 Charger les étudiants'}
+              </button>
+              <ExportButton />
+            </div>
           </div>
+          
+          {students.length === 0 && !loading && (
+            <div className="empty-state">
+              <p>Cliquez sur "Charger les étudiants" pour voir la liste.</p>
+              <p className="empty-hint">💡 Cette action utilise l'API GitHub (rate limit)</p>
+            </div>
+          )}
+          
+          <div className="pagination-info">
+            {searchQuery ? (
+              <span>{total} résultat{total !== 1 ? 's' : ''} pour "{searchQuery}"</span>
+            ) : (
+              <span>Page {page} sur {totalPages} ({total} étudiants)</span>
+            )}
+          </div>
+          
           <StudentList 
             students={students}
             loading={loading}
             onSelectStudent={handleSelectStudent}
           />
+          
+          {totalPages > 1 && (
+            <div className="pagination-controls">
+              <button 
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1 || loading}
+              >
+                ← Précédent
+              </button>
+              <span>Page {page} / {totalPages}</span>
+              <button 
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages || loading}
+              >
+                Suivant →
+              </button>
+            </div>
+          )}
         </section>
       </main>
     </div>

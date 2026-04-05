@@ -1,6 +1,7 @@
 import express from 'express';
 import GitHubService from '../services/github.js';
 import { calculateStudentMetrics } from '../services/metrics.js';
+import { getCacheKey, getFromCache, setCache } from '../services/cache.js';
 
 const router = express.Router();
 
@@ -15,21 +16,29 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
-    const { accessToken } = req.user;
+    // Paramètres de pagination
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const search = req.query.search || '';
+    
+    // Utiliser le PAT s'il est configuré, sinon utiliser le token OAuth
+    const accessToken = req.session.pat || req.user.accessToken;
     const github = new GitHubService(accessToken);
     
-    // Récupérer l'organisation depuis les paramètres ou utiliser une valeur par défaut
-    const org = req.query.org || 'Epitech';
+    // Récupérer l'organisation depuis les paramètres ou utiliser celle sélectionnée
+    const org = req.query.org || req.session.selectedOrg || 'Epitech';
     
-    // Récupérer les membres de l'organisation
-    const members = await github.getOrgMembers(org);
+    // Vérifier le cache
+    const cacheKey = getCacheKey('students', { org, accessToken: accessToken.slice(0, 10) });
+    let students = getFromCache(cacheKey);
     
-    // Limiter le nombre d'étudiants pour éviter les rate limits
-    const limitedMembers = members.slice(0, 50);
+    if (!students) {
+      // Récupérer tous les membres de l'organisation
+      const members = await github.getOrgMembers(org, 200);
     
     // Récupérer les détails et métriques pour chaque étudiant
-    const students = await Promise.all(
-      limitedMembers.map(async (member) => {
+    let students = await Promise.all(
+      members.map(async (member) => {
         try {
           // Récupérer les infos utilisateur
           const user = await github.getUser(member.login);
@@ -70,14 +79,42 @@ router.get('/', async (req, res) => {
       })
     );
     
-    // Trier par score d'activité (descendant)
-    const sortedStudents = students.sort((a, b) => b.activityScore - a.activityScore);
+      // Trier par score d'activité (descendant)
+      students = students.sort((a, b) => b.activityScore - a.activityScore);
+      
+      // Sauvegarder dans le cache
+      setCache(cacheKey, students);
+      console.log(`[Cache] Données étudiants mises en cache pour ${org}`);
+    } else {
+      console.log(`[Cache] Données étudiants récupérées depuis le cache pour ${org}`);
+    }
+    
+    // Filtrer par recherche si spécifié (après le cache)
+    let filteredStudents = students;
+    if (search.trim()) {
+      const searchLower = search.toLowerCase();
+      filteredStudents = students.filter(student => 
+        student.username.toLowerCase().includes(searchLower) ||
+        student.displayName.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    // Pagination
+    const total = filteredStudents.length;
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
     
     res.json({
       success: true,
-      count: sortedStudents.length,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
       organization: org,
-      students: sortedStudents
+      search: search || undefined,
+      cached: !!getFromCache(cacheKey),
+      students: paginatedStudents
     });
     
   } catch (error) {
@@ -100,7 +137,8 @@ router.get('/:username', async (req, res) => {
     }
 
     const { username } = req.params;
-    const { accessToken } = req.user;
+    // Utiliser le PAT s'il est configuré, sinon utiliser le token OAuth
+    const accessToken = req.session.pat || req.user.accessToken;
     const github = new GitHubService(accessToken);
     
     // Récupérer les infos utilisateur
