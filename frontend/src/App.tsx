@@ -4,6 +4,8 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import StudentDetail from './pages/StudentDetail'
 import PatConfig from './pages/PatConfig'
+import WebhookConfig from './pages/WebhookConfig'
+import Projects from './pages/Projects'
 import './App.css'
 
 function App() {
@@ -40,6 +42,14 @@ function App() {
         <Route 
           path="/config/pat" 
           element={user ? <PatConfig /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/config/webhook" 
+          element={user ? <WebhookConfig user={user} /> : <Navigate to="/login" />} 
+        />
+        <Route 
+          path="/projects" 
+          element={user ? <Projects user={user} /> : <Navigate to="/login" />} 
         />
         <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>

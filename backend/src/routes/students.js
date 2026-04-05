@@ -15,21 +15,19 @@ router.get('/', async (req, res) => {
       return res.status(401).json({ error: 'Non authentifié' });
     }
 
-    const { accessToken } = req.user;
+    // Utiliser le PAT s'il est configuré, sinon utiliser le token OAuth
+    const accessToken = req.session.pat || req.user.accessToken;
     const github = new GitHubService(accessToken);
     
-    // Récupérer l'organisation depuis les paramètres ou utiliser une valeur par défaut
-    const org = req.query.org || 'Epitech';
+    // Récupérer l'organisation depuis les paramètres ou utiliser celle sélectionnée
+    const org = req.query.org || req.session.selectedOrg || 'Epitech';
     
-    // Récupérer les membres de l'organisation
-    const members = await github.getOrgMembers(org);
-    
-    // Limiter le nombre d'étudiants pour éviter les rate limits
-    const limitedMembers = members.slice(0, 50);
+    // Récupérer les membres de l'organisation (max 100)
+    const members = await github.getOrgMembers(org, 100);
     
     // Récupérer les détails et métriques pour chaque étudiant
     const students = await Promise.all(
-      limitedMembers.map(async (member) => {
+      members.map(async (member) => {
         try {
           // Récupérer les infos utilisateur
           const user = await github.getUser(member.login);
@@ -100,7 +98,8 @@ router.get('/:username', async (req, res) => {
     }
 
     const { username } = req.params;
-    const { accessToken } = req.user;
+    // Utiliser le PAT s'il est configuré, sinon utiliser le token OAuth
+    const accessToken = req.session.pat || req.user.accessToken;
     const github = new GitHubService(accessToken);
     
     // Récupérer les infos utilisateur

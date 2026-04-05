@@ -7,6 +7,8 @@ import dotenv from 'dotenv';
 import studentsRoutes from './routes/students.js';
 import exportRoutes from './routes/export.js';
 import patRoutes from './routes/pat.js';
+import webhookRoutes from './routes/webhook.js';
+import projectsRoutes from './routes/projects.js';
 
 dotenv.config();
 
@@ -93,6 +95,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/students', studentsRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/pat', patRoutes);
+app.use('/api/webhook', webhookRoutes);
+app.use('/api/projects', projectsRoutes);
 
 app.listen(PORT, () => {
   console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);

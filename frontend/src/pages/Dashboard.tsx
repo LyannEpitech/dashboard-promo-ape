@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import StudentList, { Student } from '../components/StudentList';
 import ExportButton from '../components/ExportButton';
+import Navbar from '../components/Navbar';
 import './Dashboard.css';
 
 interface User {
@@ -8,17 +10,58 @@ interface User {
   displayName: string;
 }
 
+interface Org {
+  login: string;
+  name: string;
+}
+
 interface DashboardProps {
   user: User;
 }
 
 function Dashboard({ user }: DashboardProps) {
+  const navigate = useNavigate();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrg, setSelectedOrg] = useState('Epitech');
+  const [selectedOrg, setSelectedOrg] = useState('');
+  const [availableOrgs, setAvailableOrgs] = useState<Org[]>([]);
+  const [patConfigured, setPatConfigured] = useState(false);
+
+  // Récupérer les orgs disponibles via PAT
+  useEffect(() => {
+    const fetchOrgs = async () => {
+      try {
+        const response = await fetch('/api/pat/orgs', {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableOrgs(data.orgs || []);
+          if (data.orgs && data.orgs.length > 0) {
+            setSelectedOrg(data.orgs[0].login);
+            setPatConfigured(true);
+          }
+        } else if (response.status === 400) {
+          // PAT non configuré
+          setPatConfigured(false);
+          // Fallback sur Epitech
+          setSelectedOrg('Epitech');
+        }
+      } catch (err) {
+        console.error('Erreur récupération orgs:', err);
+        setPatConfigured(false);
+        setSelectedOrg('Epitech');
+      }
+    };
+    
+    fetchOrgs();
+  }, []);
 
   useEffect(() => {
+    if (!selectedOrg) return;
+    
     const fetchStudents = async () => {
       try {
         setLoading(true);
@@ -49,54 +92,68 @@ function Dashboard({ user }: DashboardProps) {
   }, [selectedOrg]);
 
   const handleSelectStudent = (username: string) => {
-    // Navigation vers la page détail (à implémenter dans US3)
-    console.log('Sélection de l\'étudiant:', username);
-    alert(`Détail de l'étudiant ${username} - À implémenter dans US3`);
+    navigate(`/student/${username}`);
   };
 
-  const handleLogout = async () => {
-    await fetch('/auth/logout', { credentials: 'include' });
-    window.location.href = '/login';
+  const handleOrgChange = async (orgLogin: string) => {
+    setSelectedOrg(orgLogin);
+    
+    // Sauvegarder l'org sélectionnée dans la session
+    if (patConfigured) {
+      try {
+        await fetch('/api/pat/select-org', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ org: orgLogin })
+        });
+      } catch (err) {
+        console.error('Erreur sauvegarde org:', err);
+      }
+    }
   };
 
   return (
     <div className="dashboard">
-      <header className="dashboard-header">
-        <div className="header-brand">
-          <h1>Dashboard Promo APE</h1>
-          <span className="header-subtitle">Vue d'ensemble de la promo</span>
-        </div>
-        
-        <div className="header-actions">
-          <div className="org-selector">
-            <label>Organisation:</label>
-            <select 
-              value={selectedOrg} 
-              onChange={(e) => setSelectedOrg(e.target.value)}
-            >
-              <option value="Epitech">Epitech</option>
-              <option value="EpitechPromo2026">Promo 2026</option>
-            </select>
-          </div>
-          
-          <div className="user-menu">
-            <span className="user-name">
-              {user.displayName || user.username}
-            </span>
-            <button onClick={handleLogout} className="logout-btn">
-              Déconnexion
-            </button>
-          </div>
-        </div>
-      </header>
+      <Navbar user={user} />
       
       <main className="dashboard-content">
+        {!patConfigured && (
+          <div className="pat-warning-banner">
+            <span>⚠️ PAT non configuré. Certaines organisations peuvent ne pas être accessibles.</span>
+            <button onClick={() => navigate('/config/pat')}>
+              Configurer PAT
+            </button>
+          </div>
+        )}
+        
         {error && (
           <div className="error-banner">
             <span>{error}</span>
             <button onClick={() => window.location.reload()}>Réessayer</button>
           </div>
         )}
+        
+        <div className="dashboard-header-row">
+          <div className="org-selector-container">
+            <label>Organisation:</label>
+            <select 
+              value={selectedOrg} 
+              onChange={(e) => handleOrgChange(e.target.value)}
+              className="org-select"
+            >
+              {availableOrgs.length > 0 ? (
+                availableOrgs.map(org => (
+                  <option key={org.login} value={org.login}>
+                    {org.name || org.login}
+                  </option>
+                ))
+              ) : (
+                <option value="Epitech">Epitech</option>
+              )}
+            </select>
+          </div>
+        </div>
         
         <div className="dashboard-stats">
           <div className="stat-card">

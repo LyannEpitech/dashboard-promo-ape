@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Navbar from '../components/Navbar';
 import './PatConfig.css';
 
 interface Org {
@@ -94,8 +95,10 @@ function PatConfig() {
   };
 
   return (
-    <div className="pat-config">
-      <h2>Configuration du Personal Access Token (PAT)</h2>
+    <div className="pat-config-page">
+      <Navbar />
+      <div className="pat-config">
+        <h2>Configuration du Personal Access Token (PAT)</h2>
       
       {patStatus?.hasPat && (
         <div className="pat-status">
@@ -162,8 +165,6 @@ function PatConfig() {
         </div>
       )}
 
-      <div className="pat-actions">
-        <a href="/dashboard" className="btn-secondary">Retour au Dashboard</a>
       </div>
     </div>
   );

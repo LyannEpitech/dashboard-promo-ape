@@ -3,49 +3,59 @@
   background: #f5f7fa;
 }
 
-.dashboard-header {
-  background: #24292e;
-  color: white;
-  padding: 1rem 2rem;
+.dashboard-content {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pat-warning-banner {
+  background: #fff3cd;
+  border: 1px solid #ffc107;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
-.header-brand h1 {
-  margin: 0;
-  font-size: 1.5rem;
+.pat-warning-banner button {
+  background: #ffc107;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
 }
 
-.header-subtitle {
-  font-size: 0.9rem;
-  opacity: 0.8;
-}
-
-.header-actions {
+.dashboard-header-row {
   display: flex;
-  align-items: center;
-  gap: 2rem;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
 }
 
-.org-selector {
+.org-selector-container {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  background: white;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
-.org-selector label {
-  font-size: 0.9rem;
+.org-selector-container label {
+  font-weight: 500;
+  color: #555;
 }
 
-.org-selector select {
+.org-select {
   padding: 0.5rem;
-  border: none;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  background: rgba(255,255,255,0.1);
-  color: white;
+  background: white;
   cursor: pointer;
+  min-width: 200px;
 }
 
 .org-selector select option {
