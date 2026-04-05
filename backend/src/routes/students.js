@@ -1,6 +1,7 @@
 import express from 'express';
 import GitHubService from '../services/github.js';
 import { calculateStudentMetrics } from '../services/metrics.js';
+import { getCacheKey, getFromCache, setCache } from '../services/cache.js';
 
 const router = express.Router();
 
@@ -27,8 +28,13 @@ router.get('/', async (req, res) => {
     // Récupérer l'organisation depuis les paramètres ou utiliser celle sélectionnée
     const org = req.query.org || req.session.selectedOrg || 'Epitech';
     
-    // Récupérer tous les membres de l'organisation
-    const members = await github.getOrgMembers(org, 200);
+    // Vérifier le cache
+    const cacheKey = getCacheKey('students', { org, accessToken: accessToken.slice(0, 10) });
+    let students = getFromCache(cacheKey);
+    
+    if (!students) {
+      // Récupérer tous les membres de l'organisation
+      const members = await github.getOrgMembers(org, 200);
     
     // Récupérer les détails et métriques pour chaque étudiant
     let students = await Promise.all(
@@ -73,23 +79,31 @@ router.get('/', async (req, res) => {
       })
     );
     
-    // Filtrer par recherche si spécifié
+      // Trier par score d'activité (descendant)
+      students = students.sort((a, b) => b.activityScore - a.activityScore);
+      
+      // Sauvegarder dans le cache
+      setCache(cacheKey, students);
+      console.log(`[Cache] Données étudiants mises en cache pour ${org}`);
+    } else {
+      console.log(`[Cache] Données étudiants récupérées depuis le cache pour ${org}`);
+    }
+    
+    // Filtrer par recherche si spécifié (après le cache)
+    let filteredStudents = students;
     if (search.trim()) {
       const searchLower = search.toLowerCase();
-      students = students.filter(student => 
+      filteredStudents = students.filter(student => 
         student.username.toLowerCase().includes(searchLower) ||
         student.displayName.toLowerCase().includes(searchLower)
       );
     }
     
-    // Trier par score d'activité (descendant)
-    const sortedStudents = students.sort((a, b) => b.activityScore - a.activityScore);
-    
     // Pagination
-    const total = sortedStudents.length;
+    const total = filteredStudents.length;
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
-    const paginatedStudents = sortedStudents.slice(startIndex, endIndex);
+    const paginatedStudents = filteredStudents.slice(startIndex, endIndex);
     
     res.json({
       success: true,
@@ -99,6 +113,7 @@ router.get('/', async (req, res) => {
       totalPages: Math.ceil(total / limit),
       organization: org,
       search: search || undefined,
+      cached: !!getFromCache(cacheKey),
       students: paginatedStudents
     });
     
