@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './StudentList.css';
 
-interface Student {
+export interface Student {
   username: string;
   displayName: string;
   avatarUrl: string;

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import StudentList from '../components/StudentList';
+import StudentList, { Student } from '../components/StudentList';
 import './Dashboard.css';
 
 interface User {
@@ -12,7 +12,7 @@ interface DashboardProps {
 }
 
 function Dashboard({ user }: DashboardProps) {
-  const [students, setStudents] = useState([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedOrg, setSelectedOrg] = useState('Epitech');

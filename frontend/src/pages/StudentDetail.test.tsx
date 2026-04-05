@@ -3,6 +3,9 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import StudentDetail from './StudentDetail';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const global: any;
+
 const mockStudent = {
   username: 'teststudent',
   displayName: 'Test Student',
