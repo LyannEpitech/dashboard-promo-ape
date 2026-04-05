@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './StudentList.css';
 
 interface Student {
@@ -66,7 +66,7 @@ function StudentList({ students, loading, onSelectStudent }: StudentListProps) {
       <div className="student-list-filters">
         <div className="filter-group">
           <label>Trier par:</label>
-          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)}>
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'activity' | 'commits' | 'name')}>
             <option value="activity">Score d'activité</option>
             <option value="commits">Nombre de commits</option>
             <option value="name">Nom</option>
@@ -75,7 +75,7 @@ function StudentList({ students, loading, onSelectStudent }: StudentListProps) {
         
         <div className="filter-group">
           <label>Filtrer:</label>
-          <select value={filter} onChange={(e) => setFilter(e.target.value as any)}>
+          <select value={filter} onChange={(e) => setFilter(e.target.value as 'all' | 'inactive' | 'rush')}>
             <option value="all">Tous</option>
             <option value="inactive">Inactifs (3j+)</option>
             <option value="rush">Rush (24h)</option>

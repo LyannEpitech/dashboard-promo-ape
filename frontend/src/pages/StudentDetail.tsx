@@ -42,34 +42,34 @@ function StudentDetail() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    const fetchStudentDetail = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/students/${username}`, {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          throw new Error('Erreur lors de la récupération des détails');
+        }
+        
+        const data = await response.json();
+        setStudent(data.student);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchStudentDetail();
   }, [username]);
-
-  const fetchStudentDetail = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch(`/api/students/${username}`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        throw new Error('Erreur lors de la récupération des détails');
-      }
-      
-      const data = await response.json();
-      setStudent(data.student);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleBack = () => {
     navigate('/dashboard');

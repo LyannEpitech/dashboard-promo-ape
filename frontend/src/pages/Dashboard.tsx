@@ -18,34 +18,34 @@ function Dashboard({ user }: DashboardProps) {
   const [selectedOrg, setSelectedOrg] = useState('Epitech');
 
   useEffect(() => {
+    const fetchStudents = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const response = await fetch(`/api/students?org=${selectedOrg}`, {
+          credentials: 'include'
+        });
+        
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = '/login';
+            return;
+          }
+          throw new Error('Erreur lors de la récupération des étudiants');
+        }
+        
+        const data = await response.json();
+        setStudents(data.students);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Erreur inconnue');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     fetchStudents();
   }, [selectedOrg]);
-
-  const fetchStudents = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const response = await fetch(`/api/students?org=${selectedOrg}`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        if (response.status === 401) {
-          window.location.href = '/login';
-          return;
-        }
-        throw new Error('Erreur lors de la récupération des étudiants');
-      }
-      
-      const data = await response.json();
-      setStudents(data.students || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur inconnue');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSelectStudent = (username: string) => {
     // Navigation vers la page détail (à implémenter dans US3)
@@ -93,7 +93,7 @@ function Dashboard({ user }: DashboardProps) {
         {error && (
           <div className="error-banner">
             <span>{error}</span>
-            <button onClick={fetchStudents}>Réessayer</button>
+            <button onClick={() => window.location.reload()}>Réessayer</button>
           </div>
         )}
         
