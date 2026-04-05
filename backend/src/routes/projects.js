@@ -84,9 +84,19 @@ router.get('/', async (req, res) => {
     
   } catch (error) {
     console.error('Erreur lors de la récupération des projets:', error);
+    
+    // Message d'erreur plus explicite
+    let errorMessage = error.message;
+    if (error.message.includes('Not Found') || error.message.includes('404')) {
+      errorMessage = 'Organisation non trouvée ou accès refusé. Vérifiez votre PAT ou les permissions.';
+    } else if (error.message.includes('Bad credentials') || error.message.includes('401')) {
+      errorMessage = 'Token d\'authentification invalide. Configurez un PAT valide.';
+    }
+    
     res.status(500).json({
       error: 'Erreur lors de la récupération des projets',
-      message: error.message
+      message: errorMessage,
+      requiresPat: !req.session.pat
     });
   }
 });
