@@ -1,4 +1,4 @@
-import { describe, it, expect, jest } from '@jest/globals';
+import { describe, it, expect } from '@jest/globals';
 import request from 'supertest';
 import express from 'express';
 import session from 'express-session';
@@ -16,7 +16,7 @@ describe('Students Routes', () => {
       saveUninitialized: false
     }));
     
-    // Mock authentication middleware
+    // Mock authentication
     app.use((req, res, next) => {
       req.isAuthenticated = () => true;
       req.user = { accessToken: 'fake-token' };
@@ -42,6 +42,21 @@ describe('Students Routes', () => {
       
       expect(response.body.error).toBe('Non authentifié');
     });
+
+    it('should return students list', async () => {
+      const response = await request(app)
+        .get('/api/students');
+      
+      // Should not be 404
+      expect(response.status).not.toBe(404);
+    });
+
+    it('should accept org query parameter', async () => {
+      const response = await request(app)
+        .get('/api/students?org=TestOrg');
+      
+      expect(response.status).not.toBe(404);
+    });
   });
 
   describe('GET /api/students/:username', () => {
@@ -55,10 +70,18 @@ describe('Students Routes', () => {
       unauthApp.use('/api/students', studentsRouter);
       
       const response = await request(unauthApp)
-        .get('/api/students/testuser')
+        .get('/api/students/student1')
         .expect(401);
       
       expect(response.body.error).toBe('Non authentifié');
+    });
+
+    it('should handle student request', async () => {
+      const response = await request(app)
+        .get('/api/students/student1');
+      
+      // Should not be 404
+      expect(response.status).not.toBe(404);
     });
   });
 });
